@@ -4,8 +4,10 @@ var chai        = require('chai')
   , dialect     = Support.getTestDialect()
   , Promise     = require(__dirname + '/../lib/promise')
   , Transaction = require(__dirname + '/../lib/transaction')
-  , sinon       = require('sinon');
+  , sinon       = require('sinon')
+  , current     = Support.sequelize;
 
+if (current.dialect.supports.transactions) {
 
 describe(Support.getTestDialectTeaser("Transaction"), function () {
   this.timeout(4000);
@@ -40,22 +42,49 @@ describe(Support.getTestDialectTeaser("Transaction"), function () {
       });
     });
     it('supports automatically rolling back with a thrown error', function () {
-      return this.sequelize.transaction(function (t) {
+      return expect(this.sequelize.transaction(function (t) {
         throw new Error('Yolo');
-      }).catch(function (err) {
-        expect(err).to.be.ok;
-      });
+      })).to.eventually.be.rejected;
     });
     it('supports automatically rolling back with a rejection', function () {
-      return this.sequelize.transaction(function (t) {
+      return expect(this.sequelize.transaction(function (t) {
         return Promise.reject('Swag');
-      }).catch(function (err) {
-        expect(err).to.be.ok;
-      });
+      })).to.eventually.be.rejected;
+    });
+    it('errors when no promise chain is returned', function () {
+      return expect(this.sequelize.transaction(function (t) {
+        
+      })).to.eventually.be.rejected;
     });
   });
 
-  if (dialect !== 'sqlite') {
+  it('does not allow queries after commit', function () {
+    var self = this;
+    return expect(
+      this.sequelize.transaction().then(function (t) {
+        return self.sequelize.query("SELECT 1+1", null, {transaction: t, raw: true}).then(function () {
+          return t.commit();
+        }).then(function () {
+          return self.sequelize.query("SELECT 1+1", null, {transaction: t, raw: true});
+        });
+      })
+    ).to.eventually.be.rejected;
+  });
+
+  it('does not allow queries after rollback', function () {
+    var self = this;
+    return expect(
+      this.sequelize.transaction().then(function (t) {
+        return self.sequelize.query("SELECT 1+1", null, {transaction: t, raw: true}).then(function () {
+          return t.commit();
+        }).then(function () {
+          return self.sequelize.query("SELECT 1+1", null, {transaction: t, raw: true});
+        });
+      })
+    ).to.eventually.be.rejected;
+  });
+
+  if (current.dialect.supports.lock) {
     describe('row locking', function () {
       this.timeout(10000);
       it('supports for update', function (done) {
@@ -75,7 +104,7 @@ describe(Support.getTestDialectTeaser("Transaction"), function () {
               where: {
                 username: 'jan'
               }
-            }, { 
+            }, {
               lock: t1.LOCK.UPDATE,
               transaction: t1
             }).then(function (t1Jan) {
@@ -173,3 +202,5 @@ describe(Support.getTestDialectTeaser("Transaction"), function () {
     });
   }
 });
+
+}

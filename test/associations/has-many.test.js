@@ -9,7 +9,9 @@ var chai      = require('chai')
   , _         = require('lodash')
   , moment    = require('moment')
   , sinon     = require('sinon')
-  , Promise   = Sequelize.Promise;
+  , Promise   = Sequelize.Promise
+  , current   = Support.sequelize
+  , dialect   = Support.getTestDialect();
 
 chai.config.includeStack = true;
 
@@ -49,43 +51,45 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         expect(Object.keys(this.Label.rawAttributes).length).to.equal(3);
       });
 
-      it('supports transactions', function() {
-        var Article, Label, sequelize, article, label, t;
-        return Support.prepareTransactionTest(this.sequelize).then(function(_sequelize) {
-          sequelize = _sequelize;
-          Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          var Article, Label, sequelize, article, label, t;
+          return Support.prepareTransactionTest(this.sequelize).then(function(_sequelize) {
+            sequelize = _sequelize;
+            Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          Article.hasMany(Label);
+            Article.hasMany(Label);
 
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            Article.create({ title: 'foo' }),
-            Label.create({ text: 'bar' })
-          ]);
-        }).spread(function (_article, _label) {
-          article = _article;
-          label = _label;
-          return sequelize.transaction();
-        }).then(function(_t) {
-          t = _t;
-          return article.setLabels([ label ], { transaction: t });
-        }).then(function() {
-          return Article.all({ transaction: t });
-        }).then(function(articles) {
-          return articles[0].hasLabel(label).then(function(hasLabel) {
-            expect(hasLabel).to.be.false;
-          });
-        }).then(function () {
-          return Article.all({ transaction: t });
-        }).then(function(articles) {
-          return articles[0].hasLabel(label, { transaction: t }).then(function(hasLabel) {
-            expect(hasLabel).to.be.true;
-            return t.rollback();
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              Article.create({ title: 'foo' }),
+              Label.create({ text: 'bar' })
+            ]);
+          }).spread(function (_article, _label) {
+            article = _article;
+            label = _label;
+            return sequelize.transaction();
+          }).then(function(_t) {
+            t = _t;
+            return article.setLabels([ label ], { transaction: t });
+          }).then(function() {
+            return Article.all({ transaction: t });
+          }).then(function(articles) {
+            return articles[0].hasLabel(label).then(function(hasLabel) {
+              expect(hasLabel).to.be.false;
+            });
+          }).then(function () {
+            return Article.all({ transaction: t });
+          }).then(function(articles) {
+            return articles[0].hasLabel(label, { transaction: t }).then(function(hasLabel) {
+              expect(hasLabel).to.be.true;
+              return t.rollback();
+            });
           });
         });
-      });
+      }
 
       it('does not have any labels assigned to it initially', function() {
         return Promise.all([
@@ -154,41 +158,43 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         return this.sequelize.sync({ force: true });
       });
 
-      it('supports transactions', function () {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.sequelize = sequelize;
-          this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function () {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.sequelize = sequelize;
+            this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          this.Article.hasMany(this.Label);
+            this.Article.hasMany(this.Label);
 
-          return this.sequelize.sync({ force: true });
-        }).then(function () {
-          return Promise.all([
-            this.Article.create({ title: 'foo' }),
-            this.Label.create({ text: 'bar' })
-          ]);
-        }).spread(function (article, label) {
-          this.article = article;
-          this.label = label;
-          return this.sequelize.transaction();
-        }).then(function(t) {
-          this.t = t;
-          return this.article.setLabels([ this.label ], { transaction: t });
-        }).then(function() {
-          return this.Article.all({ transaction: this.t });
-        }).then(function(articles) {
-          return Promise.all([
-            articles[0].hasLabels([ this.label ]),
-            articles[0].hasLabels([ this.label ], { transaction: this.t })
-          ]);
-        }).spread(function(hasLabel1, hasLabel2) {
-          expect(hasLabel1).to.be.false;
-          expect(hasLabel2).to.be.true;
+            return this.sequelize.sync({ force: true });
+          }).then(function () {
+            return Promise.all([
+              this.Article.create({ title: 'foo' }),
+              this.Label.create({ text: 'bar' })
+            ]);
+          }).spread(function (article, label) {
+            this.article = article;
+            this.label = label;
+            return this.sequelize.transaction();
+          }).then(function(t) {
+            this.t = t;
+            return this.article.setLabels([ this.label ], { transaction: t });
+          }).then(function() {
+            return this.Article.all({ transaction: this.t });
+          }).then(function(articles) {
+            return Promise.all([
+              articles[0].hasLabels([ this.label ]),
+              articles[0].hasLabels([ this.label ], { transaction: this.t })
+            ]);
+          }).spread(function(hasLabel1, hasLabel2) {
+            expect(hasLabel1).to.be.false;
+            expect(hasLabel2).to.be.true;
 
-          return this.t.rollback();
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it('answers false if only some labels have been assigned', function() {
         return Promise.all([
@@ -248,36 +254,39 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
     });
 
     describe('setAssociations', function() {
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          this.Article.hasMany(this.Label);
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          this.sequelize = sequelize;
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.Article.create({ title: 'foo' }),
-            this.Label.create({ text: 'bar' }),
-            this.sequelize.transaction()
-          ]);
-        }).spread(function(article, label, t) {
-          this.article = article;
-          this. t = t;
-          return article.setLabels([ label ], { transaction: t });
-        }).then(function() {
-          return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: undefined });
-        }).then(function(labels) {
-          expect(labels.length).to.equal(0);
+            this.Article.hasMany(this.Label);
 
-          return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: this.t });
-        }).then(function(labels) {
-          expect(labels.length).to.equal(1);
-          return this.t.rollback();
+            this.sequelize = sequelize;
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.Article.create({ title: 'foo' }),
+              this.Label.create({ text: 'bar' }),
+              this.sequelize.transaction()
+            ]);
+          }).spread(function(article, label, t) {
+            this.article = article;
+            this. t = t;
+            return article.setLabels([ label ], { transaction: t });
+          }).then(function() {
+            return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: undefined });
+          }).then(function(labels) {
+            expect(labels.length).to.equal(0);
+
+            return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: this.t });
+          }).then(function(labels) {
+            expect(labels.length).to.equal(1);
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it("clears associations when passing null to the set-method", function() {
         var User = this.sequelize.define('User', { username: DataTypes.STRING })
@@ -365,37 +374,39 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
     });
 
     describe('addAssociations', function() {
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
-          this.Article.hasMany(this.Label);
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
+            this.Article.hasMany(this.Label);
 
-          this.sequelize = sequelize;
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.Article.create({ title: 'foo' }),
-            this.Label.create({ text: 'bar' })
-          ]);
-        }).spread(function (article, label) {
-          this.article = article;
-          this.label = label;
-          return this.sequelize.transaction();
-        }).then(function (t) {
-          this.t = t;
-          return this.article.addLabel(this.label, { transaction: this.t });
-        }).then(function () {
-          return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: undefined });
-        }).then(function (labels) {
-          expect(labels.length).to.equal(0);
+            this.sequelize = sequelize;
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.Article.create({ title: 'foo' }),
+              this.Label.create({ text: 'bar' })
+            ]);
+          }).spread(function (article, label) {
+            this.article = article;
+            this.label = label;
+            return this.sequelize.transaction();
+          }).then(function (t) {
+            this.t = t;
+            return this.article.addLabel(this.label, { transaction: this.t });
+          }).then(function () {
+            return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: undefined });
+          }).then(function (labels) {
+            expect(labels.length).to.equal(0);
 
-          return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: this.t });
-        }).then(function(labels) {
-          expect(labels.length).to.equal(1);
-          return this.t.rollback();
+            return this.Label.findAll({ where: { ArticleId: this.article.id }, transaction: this.t });
+          }).then(function(labels) {
+            expect(labels.length).to.equal(1);
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it('supports passing the primary key instead of an object', function () {
         var Article = this.sequelize.define('Article', { 'title': DataTypes.STRING })
@@ -520,36 +531,38 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.sequelize = sequelize;
-          this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.sequelize = sequelize;
+            this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          this.Article.hasMany(this.Label);
+            this.Article.hasMany(this.Label);
 
-          return sequelize.sync({ force: true});
-        }).then(function () {
-          return this.Article.create({ title: 'foo' });
-        }).then(function(article) {
-          this.article = article;
-          return this.sequelize.transaction();
-        }).then(function (t) {
-          this.t = t;
-          return this.article.createLabel({ text: 'bar' }, { transaction: this.t });
-        }).then(function() {
-          return this.Label.findAll();
-        }).then(function (labels) {
-          expect(labels.length).to.equal(0);
-          return this.Label.findAll({ where: { ArticleId: this.article.id }});
-        }).then(function(labels) {
-          expect(labels.length).to.equal(0);
-          return this.Label.findAll({ where: { ArticleId: this.article.id }}, { transaction: this.t });
-        }).then(function(labels) {
-          expect(labels.length).to.equal(1);
-          return this.t.rollback();
+            return sequelize.sync({ force: true});
+          }).then(function () {
+            return this.Article.create({ title: 'foo' });
+          }).then(function(article) {
+            this.article = article;
+            return this.sequelize.transaction();
+          }).then(function (t) {
+            this.t = t;
+            return this.article.createLabel({ text: 'bar' }, { transaction: this.t });
+          }).then(function() {
+            return this.Label.findAll();
+          }).then(function (labels) {
+            expect(labels.length).to.equal(0);
+            return this.Label.findAll({ where: { ArticleId: this.article.id }});
+          }).then(function(labels) {
+            expect(labels.length).to.equal(0);
+            return this.Label.findAll({ where: { ArticleId: this.article.id }}, { transaction: this.t });
+          }).then(function(labels) {
+            expect(labels.length).to.equal(1);
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it('supports passing the field option', function () {
         var Article = this.sequelize.define('Article', {
@@ -773,39 +786,41 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.sequelize = sequelize;
-          this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
-          this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.sequelize = sequelize;
+            this.Article = sequelize.define('Article', { 'title': DataTypes.STRING });
+            this.Label   = sequelize.define('Label', { 'text': DataTypes.STRING });
 
-          this.Article.hasMany(this.Label);
-          this.Label.hasMany(this.Article);
+            this.Article.hasMany(this.Label);
+            this.Label.hasMany(this.Article);
 
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.Article.create({ title: 'foo' }),
-            this.Label.create({ text: 'bar' }),
-            this.sequelize.transaction()
-          ]);
-        }).spread(function (article, label, t) {
-          this.t = t;
-          return article.setLabels([ label ], { transaction: t });
-        }).then(function() {
-          return this.Article.all({ transaction: this.t });
-        }).then(function(articles) {
-          return articles[0].getLabels();
-        }).then(function(labels) {
-          expect(labels).to.have.length(0);
-          return this.Article.all({ transaction: this.t });
-        }).then(function(articles) {
-          return articles[0].getLabels({ transaction: this.t });
-        }).then(function(labels) {
-          expect(labels).to.have.length(1);
-          return this.t.rollback();
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.Article.create({ title: 'foo' }),
+              this.Label.create({ text: 'bar' }),
+              this.sequelize.transaction()
+            ]);
+          }).spread(function (article, label, t) {
+            this.t = t;
+            return article.setLabels([ label ], { transaction: t });
+          }).then(function() {
+            return this.Article.all({ transaction: this.t });
+          }).then(function(articles) {
+            return articles[0].getLabels();
+          }).then(function(labels) {
+            expect(labels).to.have.length(0);
+            return this.Article.all({ transaction: this.t });
+          }).then(function(articles) {
+            return articles[0].getLabels({ transaction: this.t });
+          }).then(function(labels) {
+            expect(labels).to.have.length(1);
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it('gets all associated objects with all fields', function() {
         return this.User.find({where: {username: 'John'}}).then(function (john) {
@@ -1094,36 +1109,38 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.User = sequelize.define('User', { username: DataTypes.STRING });
-          this.Task = sequelize.define('Task', { title: DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.User = sequelize.define('User', { username: DataTypes.STRING });
+            this.Task = sequelize.define('Task', { title: DataTypes.STRING });
 
-          this.User.hasMany(this.Task);
-          this.Task.hasMany(this.User);
+            this.User.hasMany(this.Task);
+            this.Task.hasMany(this.User);
 
-          this.sequelize = sequelize;
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.Task.create({ title: 'task' }),
-            this.sequelize.transaction()
-          ]);
-        }).spread(function(task, t) {
-          this.task = task;
-          this.t = t;
-          return task.createUser({ username: 'foo' }, { transaction: t });
-        }).then(function() {
-          return this.task.getUsers();
-        }).then(function(users) {
-          expect(users).to.have.length(0);
+            this.sequelize = sequelize;
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.Task.create({ title: 'task' }),
+              this.sequelize.transaction()
+            ]);
+          }).spread(function(task, t) {
+            this.task = task;
+            this.t = t;
+            return task.createUser({ username: 'foo' }, { transaction: t });
+          }).then(function() {
+            return this.task.getUsers();
+          }).then(function(users) {
+            expect(users).to.have.length(0);
 
-          return this.task.getUsers({ transaction: this.t });
-        }).then(function(users) {
-          expect(users).to.have.length(1);
-          return this.t.rollback();
+            return this.task.getUsers({ transaction: this.t });
+          }).then(function(users) {
+            expect(users).to.have.length(1);
+            return this.t.rollback();
+          });
         });
-      });
+      }
 
       it('supports setting through table attributes', function () {
         var User = this.sequelize.define('user', {})
@@ -1206,77 +1223,78 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it('supports transactions', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.User = sequelize.define('User', { username: DataTypes.STRING });
-          this.Task = sequelize.define('Task', { title: DataTypes.STRING });
+      if (current.dialect.supports.transactions) {
+        it('supports transactions', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.User = sequelize.define('User', { username: DataTypes.STRING });
+            this.Task = sequelize.define('Task', { title: DataTypes.STRING });
 
-          this.User.hasMany(this.Task);
-          this.Task.hasMany(this.User);
+            this.User.hasMany(this.Task);
+            this.Task.hasMany(this.User);
 
-          this.sequelize = sequelize;
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.User.create({ username: 'foo' }),
-            this.Task.create({ title: 'task' }),
-            this.sequelize.transaction()
-          ]);
-        }).spread(function(user, task, t){
-          this.task = task;
-          this.user = user;
-          this.t = t;
-          return task.addUser(user, { transaction: t });
-        }).then(function() {
-          return this.task.hasUser(this.user);
-        }).then(function(hasUser) {
-          expect(hasUser).to.be.false;
-          return this.task.hasUser(this.user, { transaction: this.t });
-        }).then(function(hasUser) {
-          expect(hasUser).to.be.true;
-          return this.t.rollback();
-        });
-      });
-
-      it('supports transactions when updating a through model', function() {
-        return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
-          this.User = sequelize.define('User', { username: DataTypes.STRING });
-          this.Task = sequelize.define('Task', { title: DataTypes.STRING });
-
-          this.UserTask = sequelize.define('UserTask', {
-            status: Sequelize.STRING
+            this.sequelize = sequelize;
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.User.create({ username: 'foo' }),
+              this.Task.create({ title: 'task' }),
+              this.sequelize.transaction()
+            ]);
+          }).spread(function(user, task, t){
+            this.task = task;
+            this.user = user;
+            this.t = t;
+            return task.addUser(user, { transaction: t });
+          }).then(function() {
+            return this.task.hasUser(this.user);
+          }).then(function(hasUser) {
+            expect(hasUser).to.be.false;
+            return this.task.hasUser(this.user, { transaction: this.t });
+          }).then(function(hasUser) {
+            expect(hasUser).to.be.true;
+            return this.t.rollback();
           });
-
-          this.User.hasMany(this.Task, { through: this.UserTask });
-          this.Task.hasMany(this.User, { through: this.UserTask });
-          this.sequelize = sequelize;
-          return sequelize.sync({ force: true });
-        }).then(function() {
-          return Promise.all([
-            this.User.create({ username: 'foo' }),
-            this.Task.create({ title: 'task' }),
-            this.sequelize.transaction({ isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED })
-          ]);
-        }).spread(function(user, task, t){
-          this.task = task;
-          this.user = user;
-          this.t = t;
-          return task.addUser(user, { status: 'pending' }); // Create without transaction, so the old value is accesible from outside the transaction
-        }).then(function() {
-          return this.task.addUser(this.user, { transaction: this.t, status: 'completed' }); // Add an already exisiting user in a transaction, updating a value in the join table
-        }).then(function(hasUser) {
-          return Promise.all([
-            this.user.getTasks(),
-            this.user.getTasks({ transaction: this.t })
-          ]);
-        }).spread(function(tasks, transactionTasks) {
-          expect(tasks[0].UserTask.status).to.equal('pending');
-          expect(transactionTasks[0].UserTask.status).to.equal('completed');
-
-          return this.t.rollback();
         });
-      });
 
+        it('supports transactions when updating a through model', function() {
+          return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
+            this.User = sequelize.define('User', { username: DataTypes.STRING });
+            this.Task = sequelize.define('Task', { title: DataTypes.STRING });
+
+            this.UserTask = sequelize.define('UserTask', {
+              status: Sequelize.STRING
+            });
+
+            this.User.hasMany(this.Task, { through: this.UserTask });
+            this.Task.hasMany(this.User, { through: this.UserTask });
+            this.sequelize = sequelize;
+            return sequelize.sync({ force: true });
+          }).then(function() {
+            return Promise.all([
+              this.User.create({ username: 'foo' }),
+              this.Task.create({ title: 'task' }),
+              this.sequelize.transaction({ isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED })
+            ]);
+          }).spread(function(user, task, t){
+            this.task = task;
+            this.user = user;
+            this.t = t;
+            return task.addUser(user, { status: 'pending' }); // Create without transaction, so the old value is accesible from outside the transaction
+          }).then(function() {
+            return this.task.addUser(this.user, { transaction: this.t, status: 'completed' }); // Add an already exisiting user in a transaction, updating a value in the join table
+          }).then(function(hasUser) {
+            return Promise.all([
+              this.user.getTasks(),
+              this.user.getTasks({ transaction: this.t })
+            ]);
+          }).spread(function(tasks, transactionTasks) {
+            expect(tasks[0].UserTask.status).to.equal('pending');
+            expect(transactionTasks[0].UserTask.status).to.equal('completed');
+
+            return this.t.rollback();
+          });
+        });
+      }
 
       it('supports passing the primary key instead of an object', function () {
         var User = this.sequelize.define('User', { username: DataTypes.STRING })
@@ -1414,7 +1432,7 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
           this.Task.create({ id: 15, title: 'task2' }),
         ]).spread(function(user, task1, task2) {
           return user.setTasks([task1, task2]).on('sql', spy).on('sql', _.after(2, function (sql) {
-            var tickChar = (Support.getTestDialect() === 'postgres') ? '"' : '`';
+            var tickChar = (Support.getTestDialect() === 'postgres' || dialect === 'mssql') ? '"' : '`';
             expect(sql).to.have.string("INSERT INTO %TasksUsers% (%TaskId%,%UserId%) VALUES (12,1),(15,1)".replace(/%/g, tickChar));
           }));
         }).then(function () {
@@ -1458,6 +1476,30 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         this.Task.hasMany(this.User, { joinTableName: 'user_has_tasks' });
 
         return this.sequelize.sync({ force: true });
+      });
+
+      it('should work with non integer primary keys', function () {
+        var Beacons = this.sequelize.define('Beacon', {
+          id: {
+            primaryKey: true,
+            type: DataTypes.UUID
+          },
+          name: {
+            type: DataTypes.STRING,
+          }
+        });
+
+        // Usar not to clash with the beforEach definition
+        var Users = this.sequelize.define('Usar', {
+          name: {
+            type: DataTypes.STRING
+          }
+        });
+
+        Beacons.hasMany(Users);
+        Users.hasMany(Beacons);
+
+        return this.sequelize.sync({force: true});
       });
 
       it('uses the specified joinTableName or a reasonable default', function() {
@@ -1562,6 +1604,41 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
             field: 'user_id',
             name: 'userId'
           }
+        });
+      });
+
+      it('should correctly get associations even after a child instance is deleted', function() {
+        var self = this
+          , user
+          , projects;
+
+        return this.sequelize.sync({force: true}).then(function() {
+          return Promise.join(
+            self.User.create({name: 'Matt'}),
+            self.Project.create({name: 'Good Will Hunting'}),
+            self.Project.create({name: 'The Departed'})
+          );
+        }).spread(function (user, project1, project2) {
+          return user.addProjects([project1, project2]).return(user);
+        }).then(function(user) {
+          return Promise.join(
+            user,
+            user.getProjects()
+          );
+        }).spread(function(user, projects) {
+          var project = projects[0];
+          expect(project).to.be.defined;
+          return project.destroy().return(user);
+        }).then(function(user) {
+          return self.User.find({
+            where: { id: user.id},
+            include: [{model: self.Project, as: 'Projects'}]
+          });
+        }).then(function(user) {
+          var projects = user.Projects
+            , project = projects[0];
+
+          expect(project).to.be.defined;
         });
       });
 
@@ -2252,89 +2329,96 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it("can restrict deletes", function() {
-        var self = this;
-        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-          , User = this.sequelize.define('User', { username: DataTypes.STRING });
+      // NOTE: mssql does not support changing an autoincrement primary key
+      if (dialect !== 'mssql') {
+        it("can cascade updates", function() {
+          var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+            , User = this.sequelize.define('User', { username: DataTypes.STRING });
 
-        User.hasMany(Task, {onDelete: 'restrict'});
+          User.hasMany(Task, {onUpdate: 'cascade'});
 
-        return this.sequelize.sync({ force: true }).bind({}).then(function() {
-          return Promise.all([
-            User.create({ username: 'foo' }),
-            Task.create({ title: 'task' }),
-          ]);
-        }).spread(function (user, task) {
-          this.user = user;
-          this.task = task;
-          return user.setTasks([task]);
-        }).then(function() {
-          return this.user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function () {
-            // Should fail due to FK violation
+          return this.sequelize.sync({ force: true }).then(function () {
+            return Promise.all([
+              User.create({ username: 'foo' }),
+              Task.create({ title: 'task' }),
+            ]);
+          }).spread(function (user, task) {
+            return user.setTasks([task]).return(user);
+          }).then(function(user) {
+            // Changing the id of a DAO requires a little dance since
+            // the `UPDATE` query generated by `save()` uses `id` in the
+            // `WHERE` clause
+
+            var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model);
+            return user.QueryInterface.update(user, tableName, {id: 999}, user.id);
+          }).then(function() {
             return Task.findAll();
+          }).then(function(tasks) {
+            expect(tasks).to.have.length(1);
+            expect(tasks[0].UserId).to.equal(999);
           });
-        }).then(function(tasks) {
-          expect(tasks).to.have.length(1);
         });
-      });
+      }
 
-      it("can cascade updates", function() {
-        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-          , User = this.sequelize.define('User', { username: DataTypes.STRING });
+      if (current.dialect.supports.constraints.restrict) {
+        it("can restrict deletes", function() {
+          var self = this;
+          var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+            , User = this.sequelize.define('User', { username: DataTypes.STRING });
 
-        User.hasMany(Task, {onUpdate: 'cascade'});
+          User.hasMany(Task, {onDelete: 'restrict'});
 
-        return this.sequelize.sync({ force: true }).then(function () {
-          return Promise.all([
-            User.create({ username: 'foo' }),
-            Task.create({ title: 'task' }),
-          ]);
-        }).spread(function (user, task) {
-          return user.setTasks([task]).return(user);
-        }).then(function(user) {
-          // Changing the id of a DAO requires a little dance since
-          // the `UPDATE` query generated by `save()` uses `id` in the
-          // `WHERE` clause
-
-          var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model);
-          return user.QueryInterface.update(user, tableName, {id: 999}, user.id);
-        }).then(function() {
-          return Task.findAll();
-        }).then(function(tasks) {
-          expect(tasks).to.have.length(1);
-          expect(tasks[0].UserId).to.equal(999);
-        });
-      });
-
-      it("can restrict updates", function() {
-        var self = this;
-        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-          , User = this.sequelize.define('User', { username: DataTypes.STRING });
-
-        User.hasMany(Task, {onUpdate: 'restrict'});
-
-        return this.sequelize.sync({ force: true }).then(function() {
-          return Promise.all([
-            User.create({ username: 'foo' }),
-            Task.create({ title: 'task' })
-          ]);
-        }).spread(function (user, task) {
-          return user.setTasks([task]).return(user);
-        }).then(function(user) {
-          // Changing the id of a DAO requires a little dance since
-          // the `UPDATE` query generated by `save()` uses `id` in the
-          // `WHERE` clause
-
-          var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model);
-          return user.QueryInterface.update(user, tableName, {id: 999}, user.id)
-          .catch(self.sequelize.ForeignKeyConstraintError, function() {
-            // Should fail due to FK violation
-            return Task.findAll();
+          return this.sequelize.sync({ force: true }).bind({}).then(function() {
+            return Promise.all([
+              User.create({ username: 'foo' }),
+              Task.create({ title: 'task' }),
+            ]);
+          }).spread(function (user, task) {
+            this.user = user;
+            this.task = task;
+            return user.setTasks([task]);
+          }).then(function() {
+            return this.user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function () {
+              // Should fail due to FK violation
+              return Task.findAll();
+            });
+          }).then(function(tasks) {
+            expect(tasks).to.have.length(1);
           });
-        }).then(function(tasks) {
-          expect(tasks).to.have.length(1);
         });
-      });
+
+        it("can restrict updates", function() {
+          var self = this;
+          var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+            , User = this.sequelize.define('User', { username: DataTypes.STRING });
+
+          User.hasMany(Task, {onUpdate: 'restrict'});
+
+          return this.sequelize.sync({ force: true }).then(function() {
+            return Promise.all([
+              User.create({ username: 'foo' }),
+              Task.create({ title: 'task' })
+            ]);
+          }).spread(function (user, task) {
+            return user.setTasks([task]).return(user);
+          }).then(function(user) {
+            // Changing the id of a DAO requires a little dance since
+            // the `UPDATE` query generated by `save()` uses `id` in the
+            // `WHERE` clause
+
+            var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model);
+            return user.QueryInterface.update(user, tableName, {id: 999}, user.id)
+            .catch(self.sequelize.ForeignKeyConstraintError, function() {
+              // Should fail due to FK violation
+              return Task.findAll();
+            });
+          }).then(function(tasks) {
+            expect(tasks).to.have.length(1);
+          });
+        });
+
+      }
+
     });
 
     describe('n:m', function () {
@@ -2382,75 +2466,79 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         });
       });
 
-      it("can restrict deletes both ways", function () {
-        var self = this
-          , spy = sinon.spy();
+      if (current.dialect.supports.constraints.restrict) {
 
-        this.User.hasMany(this.Task, { onDelete: 'RESTRICT'});
-        this.Task.hasMany(this.User, { onDelete: 'RESTRICT'});
+        it("can restrict deletes both ways", function () {
+          var self = this
+            , spy = sinon.spy();
 
-        return this.sequelize.sync({ force: true }).bind({}).then(function() {
-          return Promise.all([
-            self.User.create({ id: 67, username: 'foo' }),
-            self.Task.create({ id: 52, title: 'task' }),
-            self.User.create({ id: 89, username: 'bar' }),
-            self.Task.create({ id: 42, title: 'kast' }),
-          ]);
-        }).spread(function (user1, task1, user2, task2) {
-          this.user1 = user1;
-          this.task1 = task1;
-          this.user2 = user2;
-          this.task2 = task2;
-          return Promise.all([
-            user1.setTasks([task1]),
-            task2.setUsers([user2])
-          ]);
-        }).then(function () {
-          return Promise.all([
-            this.user1.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy), // Fails because of RESTRICT constraint
-            this.task2.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy)
-          ]);
-        }).then(function () {
-          expect(spy).to.have.been.calledTwice;
+          this.User.hasMany(this.Task, { onDelete: 'RESTRICT'});
+          this.Task.hasMany(this.User, { onDelete: 'RESTRICT'});
+
+          return this.sequelize.sync({ force: true }).bind({}).then(function() {
+            return Promise.all([
+              self.User.create({ id: 67, username: 'foo' }),
+              self.Task.create({ id: 52, title: 'task' }),
+              self.User.create({ id: 89, username: 'bar' }),
+              self.Task.create({ id: 42, title: 'kast' }),
+            ]);
+          }).spread(function (user1, task1, user2, task2) {
+            this.user1 = user1;
+            this.task1 = task1;
+            this.user2 = user2;
+            this.task2 = task2;
+            return Promise.all([
+              user1.setTasks([task1]),
+              task2.setUsers([user2])
+            ]);
+          }).then(function () {
+            return Promise.all([
+              this.user1.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy), // Fails because of RESTRICT constraint
+              this.task2.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy)
+            ]);
+          }).then(function () {
+            expect(spy).to.have.been.calledTwice;
+          });
         });
-      });
 
-      it("can cascade and restrict deletes", function () {
-        var spy = sinon.spy()
-          , self = this;
+        it("can cascade and restrict deletes", function () {
+          var spy = sinon.spy()
+            , self = this;
 
-        self.User.hasMany(self.Task, { onDelete: 'RESTRICT'});
-        self.Task.hasMany(self.User); // Implicit CASCADE
+          self.User.hasMany(self.Task, { onDelete: 'RESTRICT'});
+          self.Task.hasMany(self.User); // Implicit CASCADE
 
-        return this.sequelize.sync({ force: true }).bind({}).then(function() {
-          return Promise.all([
-            self.User.create({ id: 67, username: 'foo' }),
-            self.Task.create({ id: 52, title: 'task' }),
-            self.User.create({ id: 89, username: 'bar' }),
-            self.Task.create({ id: 42, title: 'kast' }),
-          ]);
-        }).spread(function (user1, task1, user2, task2) {
-          this.user1 = user1;
-          this.task1 = task1;
-          this.user2 = user2;
-          this.task2 = task2;
-          return Promise.all([
-            user1.setTasks([task1]),
-            task2.setUsers([user2])
-          ]);
-        }).then(function () {
-          return Promise.all([
-            this.user1.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy), // Fails because of RESTRICT constraint
-            this.task2.destroy()
-          ]);
-        }).then(function () {
-          expect(spy).to.have.been.calledOnce;
-          return self.sequelize.model('tasksusers').findAll({ where: { taskId: this.task2.id }});
-        }).then(function(usertasks) {
-          // This should not exist because deletes cascade
-          expect(usertasks).to.have.length(0);
+          return this.sequelize.sync({ force: true }).bind({}).then(function() {
+            return Promise.all([
+              self.User.create({ id: 67, username: 'foo' }),
+              self.Task.create({ id: 52, title: 'task' }),
+              self.User.create({ id: 89, username: 'bar' }),
+              self.Task.create({ id: 42, title: 'kast' }),
+            ]);
+          }).spread(function (user1, task1, user2, task2) {
+            this.user1 = user1;
+            this.task1 = task1;
+            this.user2 = user2;
+            this.task2 = task2;
+            return Promise.all([
+              user1.setTasks([task1]),
+              task2.setUsers([user2])
+            ]);
+          }).then(function () {
+            return Promise.all([
+              this.user1.destroy().catch(self.sequelize.ForeignKeyConstraintError, spy), // Fails because of RESTRICT constraint
+              this.task2.destroy()
+            ]);
+          }).then(function () {
+            expect(spy).to.have.been.calledOnce;
+            return self.sequelize.model('tasksusers').findAll({ where: { taskId: this.task2.id }});
+          }).then(function(usertasks) {
+            // This should not exist because deletes cascade
+            expect(usertasks).to.have.length(0);
+          });
         });
-      });
+
+      }
 
       it("should be possible to remove all constraints", function () {
         var self = this;

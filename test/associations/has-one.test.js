@@ -4,6 +4,7 @@ var chai      = require('chai')
   , Support   = require(__dirname + '/../support')
   , Sequelize = require('../../index')
   , Promise   = Sequelize.Promise
+  , current   = Support.sequelize;
 
 chai.config.includeStack = true
 
@@ -22,28 +23,30 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
   })
 
   describe('getAssocation', function() {
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        Group.hasOne(User)
+          Group.hasOne(User)
 
-        sequelize.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(fakeUser) {
-            User.create({ username: 'foo' }).success(function(user) {
-              Group.create({ name: 'bar' }).success(function(group) {
-                sequelize.transaction().then(function(t) {
-                  group.setUser(user, { transaction: t }).success(function() {
-                    Group.all().success(function(groups) {
-                      groups[0].getUser().success(function(associatedUser) {
-                        expect(associatedUser).to.be.null
-                        Group.all({ transaction: t }).success(function(groups) {
-                          groups[0].getUser({ transaction: t }).success(function(associatedUser) {
-                            expect(associatedUser).not.to.be.null
-                            expect(associatedUser.id).to.equal(user.id)
-                            expect(associatedUser.id).not.to.equal(fakeUser.id)
-                            t.rollback().success(function() { done() })
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(fakeUser) {
+              User.create({ username: 'foo' }).success(function(user) {
+                Group.create({ name: 'bar' }).success(function(group) {
+                  sequelize.transaction().then(function(t) {
+                    group.setUser(user, { transaction: t }).success(function() {
+                      Group.all().success(function(groups) {
+                        groups[0].getUser().success(function(associatedUser) {
+                          expect(associatedUser).to.be.null
+                          Group.all({ transaction: t }).success(function(groups) {
+                            groups[0].getUser({ transaction: t }).success(function(associatedUser) {
+                              expect(associatedUser).not.to.be.null
+                              expect(associatedUser.id).to.equal(user.id)
+                              expect(associatedUser.id).not.to.equal(fakeUser.id)
+                              t.rollback().success(function() { done() })
+                            })
                           })
                         })
                       })
@@ -55,7 +58,7 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
           })
         })
       })
-    })
+    }
 
     it('does not modify the passed arguments', function () {
       var User = this.sequelize.define('user', {})
@@ -97,36 +100,38 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
   })
 
   describe('setAssociation', function() {
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        Group.hasOne(User)
+          Group.hasOne(User)
 
-        sequelize.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Group.create({ name: 'bar' }).success(function(group) {
-              sequelize.transaction().then(function(t) {
-                group
-                  .setUser(user, { transaction: t })
-                  .success(function() {
-                    Group.all().success(function(groups) {
-                      groups[0].getUser().success(function(associatedUser) {
-                        expect(associatedUser).to.be.null
-                        t.rollback().success(function() { done() })
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Group.create({ name: 'bar' }).success(function(group) {
+                sequelize.transaction().then(function(t) {
+                  group
+                    .setUser(user, { transaction: t })
+                    .success(function() {
+                      Group.all().success(function(groups) {
+                        groups[0].getUser().success(function(associatedUser) {
+                          expect(associatedUser).to.be.null
+                          t.rollback().success(function() { done() })
+                        })
                       })
                     })
-                  })
-                  .on('sql', function(sql, uuid) {
-                    expect(uuid).to.not.equal('default')
-                  })
+                    .on('sql', function(sql, uuid) {
+                      expect(uuid).to.not.equal('default')
+                    })
+                })
               })
             })
           })
         })
       })
-    })
+    }
 
     it('can set an association with predefined primary keys', function(done) {
       var User = this.sequelize.define('UserXYZZ', { userCoolIdTag: { type: Sequelize.INTEGER, primaryKey: true }, username: Sequelize.STRING })
@@ -226,24 +231,26 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
       })
     })
 
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Sequelize.STRING })
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Sequelize.STRING })
 
-        User.hasOne(Group)
+          User.hasOne(Group)
 
-        sequelize.sync({ force: true }).success(function() {
-          User.create({ username: 'bob' }).success(function(user) {
-            sequelize.transaction().then(function(t) {
-              user.createGroup({ name: 'testgroup' }, { transaction: t }).success(function() {
-                User.all().success(function (users) {
-                  users[0].getGroup().success(function (group) {
-                    expect(group).to.be.null;
-                    User.all({ transaction: t }).success(function (users) {
-                      users[0].getGroup({ transaction: t }).success(function (group) {
-                        expect(group).to.be.not.null;
-                        t.rollback().success(function() { done() })
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'bob' }).success(function(user) {
+              sequelize.transaction().then(function(t) {
+                user.createGroup({ name: 'testgroup' }, { transaction: t }).success(function() {
+                  User.all().success(function (users) {
+                    users[0].getGroup().success(function (group) {
+                      expect(group).to.be.null;
+                      User.all({ transaction: t }).success(function (users) {
+                        users[0].getGroup({ transaction: t }).success(function (group) {
+                          expect(group).to.be.not.null;
+                          t.rollback().success(function() { done() })
+                        })
                       })
                     })
                   })
@@ -253,7 +260,8 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
           })
         })
       })
-    })
+    }
+
   })
 
   describe('foreign key', function () {
@@ -386,23 +394,32 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
       })
     })
 
-    it("can restrict deletes", function(done) {
-      var self = this
-      var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
-        , User = this.sequelize.define('User', { username: Sequelize.STRING })
+    // NOTE: mssql does not support changing an autoincrement primary key
+    if (Support.getTestDialect() !== 'mssql') {
+      it("can cascade updates", function(done) {
+        var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
+          , User = this.sequelize.define('User', { username: Sequelize.STRING })
 
-      User.hasOne(Task, {onDelete: 'restrict'})
+        User.hasOne(Task, {onUpdate: 'cascade'})
 
-      User.sync({ force: true }).success(function() {
-        Task.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Task.create({ title: 'task' }).success(function(task) {
-              user.setTask(task).success(function() {
-                user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function() {
-                  // Should fail due to FK restriction
-                  Task.findAll().success(function(tasks) {
-                    expect(tasks).to.have.length(1)
-                    done()
+        User.sync({ force: true }).success(function() {
+          Task.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Task.create({ title: 'task' }).success(function(task) {
+                user.setTask(task).success(function() {
+
+                  // Changing the id of a DAO requires a little dance since
+                  // the `UPDATE` query generated by `save()` uses `id` in the
+                  // `WHERE` clause
+
+                  var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
+                  user.QueryInterface.update(user, tableName, {id: 999}, user.id)
+                  .success(function() {
+                    Task.findAll().success(function(tasks) {
+                      expect(tasks).to.have.length(1)
+                      expect(tasks[0].UserId).to.equal(999)
+                      done()
+                    })
                   })
                 })
               })
@@ -410,31 +427,28 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
           })
         })
       })
-    })
+    }
 
-    it("can cascade updates", function(done) {
-      var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
-        , User = this.sequelize.define('User', { username: Sequelize.STRING })
+    if (current.dialect.supports.constraints.restrict) {
 
-      User.hasOne(Task, {onUpdate: 'cascade'})
+      it("can restrict deletes", function(done) {
+        var self = this
+        var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
+          , User = this.sequelize.define('User', { username: Sequelize.STRING })
 
-      User.sync({ force: true }).success(function() {
-        Task.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Task.create({ title: 'task' }).success(function(task) {
-              user.setTask(task).success(function() {
+        User.hasOne(Task, {onDelete: 'restrict'})
 
-                // Changing the id of a DAO requires a little dance since
-                // the `UPDATE` query generated by `save()` uses `id` in the
-                // `WHERE` clause
-
-                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
-                user.QueryInterface.update(user, tableName, {id: 999}, user.id)
-                .success(function() {
-                  Task.findAll().success(function(tasks) {
-                    expect(tasks).to.have.length(1)
-                    expect(tasks[0].UserId).to.equal(999)
-                    done()
+        User.sync({ force: true }).success(function() {
+          Task.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Task.create({ title: 'task' }).success(function(task) {
+                user.setTask(task).success(function() {
+                  user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function() {
+                    // Should fail due to FK restriction
+                    Task.findAll().success(function(tasks) {
+                      expect(tasks).to.have.length(1)
+                      done()
+                    })
                   })
                 })
               })
@@ -442,32 +456,32 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
           })
         })
       })
-    })
 
-    it("can restrict updates", function(done) {
-      var self = this
-      var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
-        , User = this.sequelize.define('User', { username: Sequelize.STRING })
+      it("can restrict updates", function(done) {
+        var self = this
+        var Task = this.sequelize.define('Task', { title: Sequelize.STRING })
+          , User = this.sequelize.define('User', { username: Sequelize.STRING })
 
-      User.hasOne(Task, {onUpdate: 'restrict'})
+        User.hasOne(Task, {onUpdate: 'restrict'})
 
-      User.sync({ force: true }).success(function() {
-        Task.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Task.create({ title: 'task' }).success(function(task) {
-              user.setTask(task).success(function() {
+        User.sync({ force: true }).success(function() {
+          Task.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Task.create({ title: 'task' }).success(function(task) {
+                user.setTask(task).success(function() {
 
-                // Changing the id of a DAO requires a little dance since
-                // the `UPDATE` query generated by `save()` uses `id` in the
-                // `WHERE` clause
+                  // Changing the id of a DAO requires a little dance since
+                  // the `UPDATE` query generated by `save()` uses `id` in the
+                  // `WHERE` clause
 
-                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
-                user.QueryInterface.update(user, tableName, {id: 999}, user.id)
-                .catch(self.sequelize.ForeignKeyConstraintError, function() {
-                  // Should fail due to FK restriction
-                  Task.findAll().success(function(tasks) {
-                    expect(tasks).to.have.length(1)
-                    done()
+                  var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
+                  user.QueryInterface.update(user, tableName, {id: 999}, user.id)
+                  .catch(self.sequelize.ForeignKeyConstraintError, function() {
+                    // Should fail due to FK restriction
+                    Task.findAll().success(function(tasks) {
+                      expect(tasks).to.have.length(1)
+                      done()
+                    })
                   })
                 })
               })
@@ -475,7 +489,8 @@ describe(Support.getTestDialectTeaser("HasOne"), function() {
           })
         })
       })
-    })
+
+    }
 
   })
 

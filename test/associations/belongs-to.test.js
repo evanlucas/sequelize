@@ -6,6 +6,7 @@ var chai      = require('chai')
   , Sequelize = require('../../index')
   , Promise   = Sequelize.Promise
   , assert    = require('assert')
+  , current   = Support.sequelize;
 
 chai.config.includeStack = true
 
@@ -24,26 +25,29 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
   })
 
   describe('getAssociation', function() {
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        Group.belongsTo(User)
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        sequelize.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Group.create({ name: 'bar' }).success(function(group) {
-              sequelize.transaction().then(function(t) {
-                group.setUser(user, { transaction: t }).success(function() {
-                  Group.all().success(function(groups) {
-                    groups[0].getUser().success(function(associatedUser) {
-                      expect(associatedUser).to.be.null
-                      Group.all({ transaction: t }).success(function(groups) {
-                        groups[0].getUser({ transaction: t }).success(function(associatedUser) {
-                          expect(associatedUser).to.be.not.null
-                          t.rollback().success(function() {
-                            done()
+          Group.belongsTo(User)
+
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Group.create({ name: 'bar' }).success(function(group) {
+                sequelize.transaction().then(function(t) {
+                  group.setUser(user, { transaction: t }).success(function() {
+                    Group.all().success(function(groups) {
+                      groups[0].getUser().success(function(associatedUser) {
+                        expect(associatedUser).to.be.null
+                        Group.all({ transaction: t }).success(function(groups) {
+                          groups[0].getUser({ transaction: t }).success(function(associatedUser) {
+                            expect(associatedUser).to.be.not.null
+                            t.rollback().success(function() {
+                              done()
+                            })
                           })
                         })
                       })
@@ -55,7 +59,7 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
           })
         })
       })
-    })
+    }
 
     it('does not modify the passed arguments', function () {
       var User = this.sequelize.define('user', {})
@@ -125,22 +129,25 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
   })
 
   describe('setAssociation', function() {
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        Group.belongsTo(User)
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        sequelize.sync({ force: true }).success(function() {
-          User.create({ username: 'foo' }).success(function(user) {
-            Group.create({ name: 'bar' }).success(function(group) {
-              sequelize.transaction().then(function(t) {
-                group.setUser(user, { transaction: t }).success(function() {
-                  Group.all().success(function(groups) {
-                    groups[0].getUser().success(function(associatedUser) {
-                      expect(associatedUser).to.be.null
-                      t.rollback().success(function() { done() })
+          Group.belongsTo(User)
+
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Group.create({ name: 'bar' }).success(function(group) {
+                sequelize.transaction().then(function(t) {
+                  group.setUser(user, { transaction: t }).success(function() {
+                    Group.all().success(function(groups) {
+                      groups[0].getUser().success(function(associatedUser) {
+                        expect(associatedUser).to.be.null
+                        t.rollback().success(function() { done() })
+                      })
                     })
                   })
                 })
@@ -149,7 +156,7 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
           })
         })
       })
-    })
+    }
 
     it('can set the association with declared primary keys...', function(done) {
       var User = this.sequelize.define('UserXYZ', { user_id: {type: DataTypes.INTEGER, primaryKey: true }, username: DataTypes.STRING })
@@ -276,24 +283,26 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
       })
     })
 
-    it('supports transactions', function(done) {
-      Support.prepareTransactionTest(this.sequelize, function(sequelize) {
-        var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
-          , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
+    if (current.dialect.supports.transactions) {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User  = sequelize.define('User', { username: Support.Sequelize.STRING })
+            , Group = sequelize.define('Group', { name: Support.Sequelize.STRING })
 
-        Group.belongsTo(User)
+          Group.belongsTo(User)
 
-        sequelize.sync({ force: true }).success(function() {
-          Group.create({ name: 'bar' }).success(function(group) {
-            sequelize.transaction().then(function(t) {
-              group.createUser({ username: 'foo' }, { transaction: t }).success(function() {
-                group.getUser().success(function(user) {
-                  expect(user).to.be.null
+          sequelize.sync({ force: true }).success(function() {
+            Group.create({ name: 'bar' }).success(function(group) {
+              sequelize.transaction().then(function(t) {
+                group.createUser({ username: 'foo' }, { transaction: t }).success(function() {
+                  group.getUser().success(function(user) {
+                    expect(user).to.be.null
 
-                  group.getUser({ transaction: t }).success(function(user) {
-                    expect(user).not.to.be.null
+                    group.getUser({ transaction: t }).success(function(user) {
+                      expect(user).not.to.be.null
 
-                    t.rollback().success(function() { done() })
+                      t.rollback().success(function() { done() })
+                    })
                   })
                 })
               })
@@ -301,7 +310,7 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
           })
         })
       })
-    })
+    }
   })
 
   describe("foreign key", function () {
@@ -428,91 +437,98 @@ describe(Support.getTestDialectTeaser("BelongsTo"), function() {
       })
     })
 
-    it("can restrict deletes", function(done) {
-      var self = this
-      var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-        , User = this.sequelize.define('User', { username: DataTypes.STRING })
+    if (current.dialect.supports.constraints.restrict) {
+      it("can restrict deletes", function(done) {
+        var self = this
+        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+          , User = this.sequelize.define('User', { username: DataTypes.STRING })
 
-      Task.belongsTo(User, {onDelete: 'restrict'})
+        Task.belongsTo(User, {onDelete: 'restrict'})
 
-      this.sequelize.sync({ force: true }).success(function() {
-        User.create({ username: 'foo' }).success(function(user) {
-          Task.create({ title: 'task' }).success(function(task) {
-            task.setUser(user).success(function() {
-              // Should fail due to FK restriction
-              user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function(err) {
-                expect(err).to.be.ok;
-                Task.findAll().success(function(tasks) {
-                  expect(tasks).to.have.length(1)
-                  done()
-                })
-              })
-            });
-          })
-        })
-      })
-    })
-
-    it("can cascade updates", function(done) {
-      var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-        , User = this.sequelize.define('User', { username: DataTypes.STRING })
-
-      Task.belongsTo(User, {onUpdate: 'cascade'})
-
-      this.sequelize.sync({ force: true }).success(function() {
-        User.create({ username: 'foo' }).success(function(user) {
-          Task.create({ title: 'task' }).success(function(task) {
-            task.setUser(user).success(function() {
-
-              // Changing the id of a DAO requires a little dance since
-              // the `UPDATE` query generated by `save()` uses `id` in the
-              // `WHERE` clause
-
-              var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
-              user.QueryInterface.update(user, tableName, {id: 999}, user.id)
-              .success(function() {
-                Task.findAll().success(function(tasks) {
-                  expect(tasks).to.have.length(1)
-                  expect(tasks[0].UserId).to.equal(999)
-                  done()
-                })
-              })
-            })
-          })
-        })
-      })
-    })
-
-    it("can restrict updates", function(done) {
-      var self = this
-      var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
-        , User = this.sequelize.define('User', { username: DataTypes.STRING })
-
-      Task.belongsTo(User, {onUpdate: 'restrict'})
-
-      this.sequelize.sync({ force: true }).success(function() {
-        User.create({ username: 'foo' }).success(function(user) {
-          Task.create({ title: 'task' }).success(function(task) {
-            task.setUser(user).success(function() {
-
-              // Changing the id of a DAO requires a little dance since
-              // the `UPDATE` query generated by `save()` uses `id` in the
-              // `WHERE` clause
-
-              var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
-              user.QueryInterface.update(user, tableName, {id: 999}, user.id)
-              .catch(self.sequelize.ForeignKeyConstraintError, function() {
+        this.sequelize.sync({ force: true }).success(function() {
+          User.create({ username: 'foo' }).success(function(user) {
+            Task.create({ title: 'task' }).success(function(task) {
+              task.setUser(user).success(function() {
                 // Should fail due to FK restriction
-                Task.findAll().success(function(tasks) {
-                  expect(tasks).to.have.length(1)
-                  done()
+                user.destroy().catch(self.sequelize.ForeignKeyConstraintError, function(err) {
+                  expect(err).to.be.ok;
+                  Task.findAll().success(function(tasks) {
+                    expect(tasks).to.have.length(1)
+                    done()
+                  })
+                })
+              });
+            })
+          })
+        })
+      })
+
+      it("can restrict updates", function(done) {
+        var self = this
+        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+          , User = this.sequelize.define('User', { username: DataTypes.STRING })
+
+        Task.belongsTo(User, {onUpdate: 'restrict'})
+
+        this.sequelize.sync({ force: true }).success(function() {
+          User.create({ username: 'foo' }).success(function(user) {
+            Task.create({ title: 'task' }).success(function(task) {
+              task.setUser(user).success(function() {
+
+                // Changing the id of a DAO requires a little dance since
+                // the `UPDATE` query generated by `save()` uses `id` in the
+                // `WHERE` clause
+
+                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
+                user.QueryInterface.update(user, tableName, {id: 999}, user.id)
+                .catch(self.sequelize.ForeignKeyConstraintError, function() {
+                  // Should fail due to FK restriction
+                  Task.findAll().success(function(tasks) {
+                    expect(tasks).to.have.length(1)
+                    done()
+                  })
                 })
               })
             })
           })
         })
       })
-    })
+
+    }
+
+    // NOTE: mssql does not support changing an autoincrement primary key
+    if (Support.getTestDialect() !== 'mssql') {
+      it("can cascade updates", function(done) {
+        var Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+          , User = this.sequelize.define('User', { username: DataTypes.STRING })
+
+        Task.belongsTo(User, {onUpdate: 'cascade'})
+
+        this.sequelize.sync({ force: true }).success(function() {
+          User.create({ username: 'foo' }).success(function(user) {
+            Task.create({ title: 'task' }).success(function(task) {
+              task.setUser(user).success(function() {
+
+                // Changing the id of a DAO requires a little dance since
+                // the `UPDATE` query generated by `save()` uses `id` in the
+                // `WHERE` clause
+
+                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
+                user.QueryInterface.update(user, tableName, {id: 999}, user.id)
+                .success(function() {
+                  Task.findAll().success(function(tasks) {
+                    expect(tasks).to.have.length(1)
+                    expect(tasks[0].UserId).to.equal(999)
+                    done()
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    }
+
   })
 
   describe("Association column", function() {

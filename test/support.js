@@ -5,7 +5,11 @@ var fs        = require('fs')
   , _         = require('lodash')
   , Sequelize = require(__dirname + "/../index")
   , DataTypes = require(__dirname + "/../lib/data-types")
-  , Config    = require(__dirname + "/config/config");
+  , Config    = require(__dirname + "/config/config")
+  , chai = require("chai")
+  , chaiAsPromised = require("chai-as-promised");
+
+chai.use(chaiAsPromised);
 
 // Make sure errors get thrown when testing
 Sequelize.Promise.onPossiblyUnhandledRejection(function(e, promise) {
@@ -187,7 +191,8 @@ var Support = {
   }
 };
 
-var sequelize = Support.createSequelizeInstance();
+var sequelize = Support.sequelize = Support.createSequelizeInstance();
+
 //
 // For Postgres' HSTORE functionality and to properly execute it's commands we'll need this...
 before(function() {

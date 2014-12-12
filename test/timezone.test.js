@@ -4,7 +4,6 @@ var chai        = require('chai')
   , expect      = chai.expect
   , Support     = require(__dirname + '/support')
   , dialect     = Support.getTestDialect()
-  , Transaction = require(__dirname + '/../lib/transaction')
   , Sequelize   = require(__dirname + '/../index')
   , Promise     = Sequelize.Promise
   , sinon       = require('sinon');
@@ -20,12 +19,20 @@ if (dialect !== 'sqlite') {
     });
 
     it('returns the same value for current timestamp', function () {
-      var query = "SELECT now() as now";
+      var now = 'now()'
+        , startQueryTime = Date.now();
+
+      if (dialect === 'mssql') {
+        now = 'GETDATE()';
+      }
+
+      var query = "SELECT " + now + " as now";
       return Promise.all([
         this.sequelize.query(query),
         this.sequelizeWithTimezone.query(query)
       ]).spread(function (now1, now2) {
-        expect(now1[0].now.getTime()).to.be.closeTo(now2[0].now.getTime(), 50);
+        var elapsedQueryTime = Date.now() - startQueryTime;
+        expect(now1[0].now.getTime()).to.be.closeTo(now2[0].now.getTime(), elapsedQueryTime);
       });
     });
 

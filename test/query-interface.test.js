@@ -9,9 +9,9 @@ chai.config.includeStack = true
 
 describe(Support.getTestDialectTeaser("QueryInterface"), function () {
   beforeEach(function(done) {
-    this.sequelize.options.quoteIdenifiers = true
-    this.queryInterface = this.sequelize.getQueryInterface()
-    done()
+    this.sequelize.options.quoteIdenifiers = true;
+    this.queryInterface = this.sequelize.getQueryInterface();
+    done();
   })
 
   describe('dropAllTables', function() {
@@ -88,7 +88,8 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         self.queryInterface.showIndex('Group').complete(function(err, indexes) {
           expect(err).to.be.null
 
-          var indexColumns = _.uniq(indexes.map(function(index) { return index.name }))
+          var indexColumns = _.uniq(indexes.map(function(index) { return index.name  }))
+
           expect(indexColumns).to.include('group_username_is_admin')
 
           self.queryInterface.removeIndex('Group', ['username', 'isAdmin']).complete(function(err) {
@@ -96,7 +97,6 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
 
             self.queryInterface.showIndex('Group').complete(function(err, indexes) {
               expect(err).to.be.null
-
               indexColumns = _.uniq(indexes.map(function(index) { return index.name }))
               expect(indexColumns).to.be.empty
 
@@ -124,16 +124,33 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
       Users.sync({ force: true }).success(function() {
         self.queryInterface.describeTable('_Users').complete(function(err, metadata) {
           expect(err).to.be.null
-
           var username = metadata.username
           var isAdmin  = metadata.isAdmin
           var enumVals = metadata.enumVals
 
-          expect(username.type).to.equal(dialect === 'postgres' ? 'CHARACTER VARYING' : 'VARCHAR(255)')
+          var assertVal = 'VARCHAR(255)';
+          switch(dialect){
+            case 'postgres':
+              assertVal = 'CHARACTER VARYING';
+              break;
+            case 'mssql':
+              assertVal = 'NVARCHAR';
+              break;
+          }
+          expect(username.type).to.equal(assertVal)
           expect(username.allowNull).to.be.true
           expect(username.defaultValue).to.be.null
 
-          expect(isAdmin.type).to.equal(dialect === 'postgres' ? 'BOOLEAN' : 'TINYINT(1)')
+          assertVal = 'TINYINT(1)';
+          switch(dialect){
+            case 'postgres':
+              assertVal = 'BOOLEAN';
+              break;
+            case 'mssql':
+              assertVal = 'BIT';
+              break;
+          }
+          expect(isAdmin.type).to.equal(assertVal)
           expect(isAdmin.allowNull).to.be.true
           expect(isAdmin.defaultValue).to.be.null
 
@@ -141,7 +158,6 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
             expect(enumVals.special).to.be.instanceof(Array)
             expect(enumVals.special).to.have.length(2);
           }
-
           done()
         })
       })
@@ -149,6 +165,20 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
   })
 
   describe('createTable', function () {
+    it('should create a auto increment primary key', function () {
+      return this.queryInterface.createTable('TableWithPK', {
+        table_id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        }
+      }).bind(this).then(function () {
+        return this.queryInterface.insert(null, 'TableWithPK', {}, {raw: true, returning: true}).then(function (response) {
+          expect(response.table_id || (typeof response !== "object" && response)).to.be.ok;
+        });
+      });
+    });
+
     it('should work with enums (1)', function () {
       return this.queryInterface.createTable('SomeTable', {
         someEnum: DataTypes.ENUM('value1', 'value2', 'value3')
@@ -161,8 +191,27 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
           type: DataTypes.ENUM,
           values: ['value1', 'value2', 'value3']
         }
-      })
-    })
+      });
+    });
+
+    it('should work with schemas', function () {
+      var self = this;
+      return self.sequelize.dropAllSchemas().then(function () {
+        return self.sequelize.createSchema("hero");
+      }).then(function () {
+        return self.queryInterface.createTable('User', {
+          name: {
+            type: DataTypes.STRING
+          }
+        }, {
+          schema: 'hero'
+        });
+      }).then(function () {
+        return self.queryInterface.rawSelect('User', {
+          schema: 'hero'
+        }, 'name');
+      });
+    });
   })
 
   describe('renameColumn', function() {
@@ -176,6 +225,28 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         return self.queryInterface.renameColumn('_Users', 'username', 'pseudo')
       })
     })
+
+    it('works with schemas', function () {
+      var self = this
+      var Users = self.sequelize.define('User', {
+        username: DataTypes.STRING
+      }, {
+        tableName: 'Users',
+        schema: 'archive'
+      })
+
+      return self.sequelize.dropAllSchemas().then(function () {
+        return self.sequelize.createSchema("archive");
+      }).then(function () {
+        return Users.sync({ force: true }).then(function() {
+          return self.queryInterface.renameColumn({
+            schema: 'archive',
+            tableName: 'Users'
+          }, 'username', 'pseudo');
+        });
+      });
+    });
+
     it('rename a column non-null without default value', function() {
       var self = this
       var Users = self.sequelize.define('_Users', {
@@ -203,7 +274,7 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         return self.queryInterface.renameColumn('_Users', 'active', 'enabled')
       })
     })
-    it('renames a column primary key autoincrement column', function() {
+    it('renames a column primary key autoIncrement column', function() {
       var self = this
       var Fruits = self.sequelize.define('Fruit', {
         fruitId: {
@@ -220,13 +291,40 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
     })
   });
 
+  describe('changeColumn', function () {
+    it('should support schemas', function () {
+      return this.sequelize.dropAllSchemas().bind(this).then(function () {
+        return this.sequelize.createSchema("archive");
+      }).then(function () {
+        return this.queryInterface.createTable({
+          tableName: 'users',
+          schema: 'archive'
+        }, {
+          id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+          },
+          currency: DataTypes.INTEGER
+        }).bind(this).then(function () {
+          return this.queryInterface.changeColumn({
+            tableName: 'users',
+            schema: 'archive'
+          }, 'currency', {
+            type: DataTypes.FLOAT
+          });
+        });
+      });
+    });
+  });
+
   describe('addColumn', function () {
     beforeEach(function () {
       return this.queryInterface.createTable('users', {
         id: {
           type: DataTypes.INTEGER,
           primaryKey: true,
-          autoincrement: true
+          autoIncrement: true
         }
       });
     });
@@ -236,7 +334,7 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         id: {
           type: DataTypes.INTEGER,
           primaryKey: true,
-          autoincrement: true
+          autoIncrement: true
         }
       }).bind(this).then(function () {
         return this.queryInterface.addColumn('users', 'level_id', {
@@ -244,7 +342,27 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
           references: 'level',
           referenceKey: 'id',
           onUpdate: 'cascade',
-          onDelete: 'restrict'
+          onDelete: 'set null'
+        });
+      });
+    });
+
+    it('should work with schemas', function () {
+      return this.queryInterface.createTable({
+        tableName: 'users',
+        schema: 'archive'
+      }, {
+        id: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+          autoIncrement: true
+        }
+      }).bind(this).then(function () {
+        return this.queryInterface.addColumn({
+          tableName: 'users',
+          schema: 'archive'
+        }, 'level_id', {
+          type: DataTypes.INTEGER
         });
       });
     });
@@ -267,14 +385,14 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         id: {
           type: DataTypes.INTEGER,
           primaryKey: true,
-          autoincrement: true
+          autoIncrement: true
         },
       }).bind(this).then(function () {
         return this.queryInterface.createTable('hosts', {
           id: {
             type: DataTypes.INTEGER,
             primaryKey: true,
-            autoincrement: true
+            autoIncrement: true
           },
           admin: {
             type: DataTypes.INTEGER,
@@ -292,7 +410,7 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
             references: 'users',
             referenceKey: 'id',
             onUpdate: 'cascade',
-            onDelete: 'restrict'
+            onDelete: 'set null'
           },
         })
       })
@@ -305,13 +423,13 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         var keys = Object.keys(fks[0]),
           keys2 = Object.keys(fks[1]),
           keys3 = Object.keys(fks[2])
-        if (dialect === "postgres" || dialect === "postgres-native") {
+        if (dialect === "postgres" || dialect === "postgres-native" ) {
           expect(keys).to.have.length(6)
           expect(keys2).to.have.length(7)
-          expect(keys3).to.have.length(8)
+          expect(keys3).to.have.length(7)
         } else if (dialect === "sqlite") {
           expect(keys).to.have.length(8)
-        } else if (dialect === "mysql") {
+        } else if (dialect === "mysql" || dialect == 'mssql') {
           expect(keys).to.have.length(1)
         } else {
           console.log("This test doesn't support " + dialect)
